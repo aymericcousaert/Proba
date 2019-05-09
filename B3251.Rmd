@@ -1,0 +1,210 @@
+---
+title: "TP de Probabilités"
+author: "Aymeric COUSAERT et Mathis GUILHIN"
+date: "9 mai 2019"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+
+
+#Partie 1.
+
+##Question 1
+
+Voici le code des deux générateurs de nombre pseudos-aléatoires : 
+
+###RANDU
+
+```{r}
+RANDU <- function(seed,k)
+{
+  result <- rep(0,k)
+  result[1]<-seed
+  
+  a <- 65539
+  b <- 0
+  m <- 2^31
+  
+  for(i in 2:(k+1))
+  {
+    result[i]<-(a*result[i-1]+b)%%m
+  }
+  result <- result[2:(k+1)]
+  result <- matrix(result,Nsimu,1)
+  return(result)
+}
+```
+
+###Standard Minimal
+```{r}
+StandardMinimal <- function(seed,k)
+{
+  result <- rep(0,k)
+  result[1]<-seed
+  
+  a <- 16807
+  b <- 0
+  m <- 2^31 - 1 
+  
+  for(i in 2:(k+1))
+  {
+    result[i]<-(a*result[i-1]+b)%%m
+  }
+  result <- result[2:(k+1)]
+  result <- matrix(result,Nsimu,1)
+  return(result)
+}
+```
+
+Ces deux générateurs seront testés ultérieurement.
+
+##Question 2.1
+
+Voici les différents histogrammes obtenus à partir des générateurs fournis et produits : 
+
+```{r setup, include=FALSE}
+library(randtoolbox)
+source('generateurs.R')
+
+sVN <- 9721
+sMT <- 2504
+Nsimu <- 1000
+Nrepet <- 20
+```
+
+```{r}
+vn <- VonNeumann(Nsimu,Nrepet,sVN)
+mt <- MersenneTwister(Nsimu,Nrepet,sMT)
+rd <- RANDU(3,Nsimu)
+sm <- StandardMinimal(3,Nsimu)
+
+par(mfrow=c(1,2))
+hist(mt[,1],xlab='',main='Mersenne Twister')
+hist(vn[,1],xlab='',main='Von Neumann')
+par(mfrow=c(1,2))
+hist(rd[,1],xlab='',main='RANDU')
+hist(sm[,1],xlab='',main='StandardMinimal')
+```
+
+On remarque que le générateur de Von Neumann n'est vraiment pas une distribution uniforme car la majorité des valeurs sont comprises entre 0 et 1000. On peut imaginer que comme les nombres sont obtenus en enlevant les premiers et derniers chiffres de manière symétrique, on se retrouve presque aussi souvent avec 3 chiffres que 4 chiffres mais comme y a 9 fois plus de nombre à 4 chiffres, la répartition est très déséquilibrée. 
+Quant aux autres générateurs, ils sont beaucoup plus uniformes, malgré une tendance à générer moins de chiffres proches de la borne supérieure.
+
+##Question 2.2
+
+```{r}
+par(mfrow=c(1,2))
+plot(mt[1:(Nsimu-1),1],mt[2:Nsimu,1],xlab='MT(i)', ylab='MT(i+1)', main='Mersenne Twister')
+plot(vn[1:(Nsimu-1),1],vn[2:Nsimu,1],xlab='VN(i)', ylab='VN(i+1)', main='Von Neumann')
+par(mfrow=c(1,2))
+plot(rd[1:(Nsimu-1),1],rd[2:Nsimu,1],xlab='RD(i)', ylab='RD(i+1)', main='RANDU')
+plot(sm[1:(Nsimu-1),1],sm[2:Nsimu,1],xlab='SM(i)', ylab='SM(i+1)', main='Standard Minimal')
+```
+
+Les générateurs Mersenne Twister, RANDU, Standard Minimal offrent une représentation assez similaire : des valeurs très proches fournissent des valeurs suivantes très différentes (ou éloignées) donc la répartition est assez uniforme. En revanche pour le générateur Von Neumann, on a une concentration des valeurs dans le coin inférieur gauche et les nombres à 4 chiffres sont par exemple inaccessibles depuis l'intervalle [1500; 3500], ce qui explique la répartition non uniforme observée précédement.
+
+##Question 3
+Voici le code de la fonction pour le test de fréquence monobit. La fonction prend en entrée un vecteur de nombres obtenus avec une méthode particulière et retourne une valeur qui indique l'acceptabilité d'un générateur (en dessous de 0.01 il n'est pas accepté).
+```{r}
+Frequency <- function(x, nb)
+{
+  somme <- 0
+  for (i in (1:length(x)))
+  {
+    tab <- binary(x[i])
+    tabUpdated <- tab
+    for(k in length(tab):(length(tab)-nb+1))
+    {
+      tabUpdated[k] <- 2*tab[k] - 1
+      somme <- somme + tabUpdated[k]
+    }
+  }
+  Sobs <- abs(somme) / sqrt(length(x)*nb)
+  Pval <- 2*(1-pnorm(Sobs))
+  return(Pval)
+}
+```
+
+Le générateur de MersenneTwister testé sur 32 bits renvoie une valeur de 0.22. Il passe donc le test.  
+Les générateurs de RANDU et StandardMinimal passent (avec des valeurs de 0.53 et 0.06). Cependant, il faut les tester sur 31 bits car les valeurs de renvoi sont comprises entre 0 et 2^31 - 1 et 2^31 - 2 respectivement.  
+Pour Von Neumann, nous décidons de le tester sur 13 bits. Car sa valeur maximale vaut :
+
+```{r}
+binary(9999)
+```
+
+On voit que le 14ème bit est a 1, mais malgré le fait que celui ci est visité par l'algorithme, la plupart des valeurs le comprenant ne le sont pas donc il serait inexact de le comptabililser. 
+
+Remarque : Pour StandardMinimal, on néglige ce détail au vu du nombre de valeurs.
+
+##Question 4
+
+```{r}
+Runs <- function(x,nb)
+{
+  somme <- 0
+  for (i in (1:length(x)))
+  {
+    tab <- binary(x[i])
+    tabUpdated <- tab
+    for(k in length(tab):(length(tab)-nb+1))
+    {
+      if (tab[k] == 1)
+      {
+        somme <- somme + 1
+      }
+    }
+  }
+  n <- (length(x)*nb)
+  pi <- somme/n
+  if (abs((pi - 0.5)) > 2/sqrt(n))
+  {
+    return (0)
+  }
+  else
+  {
+    r <- 1
+    for (i in (1:length(x)))
+    {
+      tab <- binary(x[i])
+      tabUpdated <- tab
+      for(k in length(tab):(length(tab)-nb+2))
+      {
+        if (tab[k] != tab[k-1])
+        {
+          r <- r + 1
+        }
+      }
+    }
+  }
+  Pval <- 2*(1-pnorm(   abs(r - 2*n*pi*(1-pi))/ (2*sqrt(n)*pi*(1-pi))   ))
+  return (Pval)
+}
+```
+
+##Quelques plus pour la mise en forme
+
+Il est possible de mettre des mots *en italique* ou **en gras**.
+On peut également faire des listes :
+
+* Item 1 
+
+* Item 2 
+
+    + sub-item 1 
+
+    + sub-item 2 
+
+Et des tableaux :
+
+Permière colonne | Deuxième colonne 
+------------- | ------------- 
+a    | x        
+b        | y        
+
+Ou mettre des formules : $Aire = \pi\,r^{2}$.
+
+###Remarque
+Rmarkdown fait gagner du temps pour les compte-rendus et permet d'intégrer plus facilement des parties de code quand on le souhaite. Toutefois, je vous conseille d'avoir un fichier .R dans lequel vous ne mettez que du code et d'intégrer celui-ci dans le .Rmd lorsque vous obtenez des résultats. Faites les commentaires au fur et à mesure et n'attendez pas la dernière heure !
