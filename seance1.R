@@ -30,7 +30,5 @@ plot(sm[1:(Nsimu-1),1],sm[2:Nsimu,1],xlab='SM(i)', ylab='SM(i+1)', main='Standar
 
 test <- rep(619,1)
 
-pval <- Runs(test,10)
-print(pval)
 
 

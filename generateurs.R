@@ -1,4 +1,4 @@
-VonNeumann <- function(n, p=1, graine)
+  VonNeumann <- function(n, p=1, graine)
 {
   x <-  rep(graine,n*p+1)
   for(i in 2:(n*p+1))
@@ -94,18 +94,24 @@ Frequency <- function(x, nb)
 Runs <- function(x,nb)
 {
   somme <- 0
+  tab <- rep(0,0)
   for (i in (1:length(x)))
   {
-    tab <- binary(x[i])
-    tabUpdated <- tab
-    for(k in length(tab):(length(tab)-nb+1))
+    nbBinaire <- binary(x[i])
+    tabPartiel <- rep(0,0)
+    for(k in (length(nbBinaire)-nb+1) : length(nbBinaire) ){
+       tabPartiel[k-length(nbBinaire)+nb] <- nbBinaire[k]    
+    }
+    tab = c(tab,tabPartiel)
+  }
+    for(k in 1:length(tab))
     {
       if (tab[k] == 1)
       {
         somme <- somme + 1
       }
     }
-  }
+  
   n <- (length(x)*nb)
   pi <- somme/n
   if (abs((pi - 0.5)) > 2/sqrt(n))
@@ -115,21 +121,18 @@ Runs <- function(x,nb)
   else
   {
     r <- 1
-    for (i in (1:length(x)))
+    for(k in 1: (length(tab)-1) )
     {
-      tab <- binary(x[i])
-      tabUpdated <- tab
-      for(k in length(tab):(length(tab)-nb+2))
+      if (tab[k] != tab[k+1])
       {
-        if (tab[k] != tab[k-1])
-        {
-          r <- r + 1
-        }
+        r <- r + 1
       }
     }
   }
   Pval <- 2*(1-pnorm(   abs(r - 2*n*pi*(1-pi))/ (2*sqrt(n)*pi*(1-pi))   ))
   return (Pval)
 }
+
+
 
 

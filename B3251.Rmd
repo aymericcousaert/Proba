@@ -3,9 +3,9 @@ title: "TP de Probabilités"
 author: "Aymeric COUSAERT et Mathis GUILHIN"
 date: "9 mai 2019"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
-  pdf_document: default
 ---
 
 
@@ -75,7 +75,7 @@ Nsimu <- 1000
 Nrepet <- 20
 ```
 
-```{r}
+```{r,  echo=FALSE}
 vn <- VonNeumann(Nsimu,Nrepet,sVN)
 mt <- MersenneTwister(Nsimu,Nrepet,sMT)
 rd <- RANDU(3,Nsimu)
@@ -94,7 +94,7 @@ Quant aux autres générateurs, ils sont beaucoup plus uniformes, malgré une tenda
 
 ##Question 2.2
 
-```{r}
+```{r,  echo=FALSE}
 par(mfrow=c(1,2))
 plot(mt[1:(Nsimu-1),1],mt[2:Nsimu,1],xlab='MT(i)', ylab='MT(i+1)', main='Mersenne Twister')
 plot(vn[1:(Nsimu-1),1],vn[2:Nsimu,1],xlab='VN(i)', ylab='VN(i+1)', main='Von Neumann')
@@ -141,22 +141,30 @@ Remarque : Pour StandardMinimal, on néglige ce détail au vu du nombre de valeurs
 
 ##Question 4
 
+Voici l'implémentation de la fonction décrite pour le test des runs :
+
 ```{r}
 Runs <- function(x,nb)
 {
   somme <- 0
+  tab <- rep(0,0)
   for (i in (1:length(x)))
   {
-    tab <- binary(x[i])
-    tabUpdated <- tab
-    for(k in length(tab):(length(tab)-nb+1))
+    nbBinaire <- binary(x[i])
+    tabPartiel <- rep(0,0)
+    for(k in (length(nbBinaire)-nb+1) : length(nbBinaire) ){
+       tabPartiel[k-length(nbBinaire)+nb] <- nbBinaire[k]    
+    }
+    tab = c(tab,tabPartiel)
+  }
+    for(k in 1:length(tab))
     {
       if (tab[k] == 1)
       {
         somme <- somme + 1
       }
     }
-  }
+  
   n <- (length(x)*nb)
   pi <- somme/n
   if (abs((pi - 0.5)) > 2/sqrt(n))
@@ -166,16 +174,11 @@ Runs <- function(x,nb)
   else
   {
     r <- 1
-    for (i in (1:length(x)))
+    for(k in 1: (length(tab)-1) )
     {
-      tab <- binary(x[i])
-      tabUpdated <- tab
-      for(k in length(tab):(length(tab)-nb+2))
+      if (tab[k] != tab[k+1])
       {
-        if (tab[k] != tab[k-1])
-        {
-          r <- r + 1
-        }
+        r <- r + 1
       }
     }
   }
@@ -184,27 +187,280 @@ Runs <- function(x,nb)
 }
 ```
 
-##Quelques plus pour la mise en forme
+Nous appliquons donc cette méthode pour chacun des générateurs sur le même nombre de valeurs que précédemment :
 
-Il est possible de mettre des mots *en italique* ou **en gras**.
-On peut également faire des listes :
+* Von Neumann : 
 
-* Item 1 
+```{r,  echo=FALSE}
+pval <- Runs(vn,13)
+print(pval)
+```
 
-* Item 2 
+* Randu
 
-    + sub-item 1 
+```{r,  echo=FALSE}
+pval <- Runs(rd,31)
+print(pval)
+```
 
-    + sub-item 2 
+* Standard Minimal
 
-Et des tableaux :
+```{r,  echo=FALSE}
+pval <- Runs(sm,31)
+print(pval)
+```
 
-Permière colonne | Deuxième colonne 
-------------- | ------------- 
-a    | x        
-b        | y        
+* Mersenne-Twister
 
-Ou mettre des formules : $Aire = \pi\,r^{2}$.
+```{r,  echo=FALSE}
+pval <- Runs(mt,32)
+print(pval)
+```
 
-###Remarque
-Rmarkdown fait gagner du temps pour les compte-rendus et permet d'intégrer plus facilement des parties de code quand on le souhaite. Toutefois, je vous conseille d'avoir un fichier .R dans lequel vous ne mettez que du code et d'intégrer celui-ci dans le .Rmd lorsque vous obtenez des résultats. Faites les commentaires au fur et à mesure et n'attendez pas la dernière heure !
+Pour Randu, la valeur est très bonne avec pval = 0.75. Le test des runs passe aussi pour Mersenne-Twister et Standard Minimal avec une valeur de 0.35. Quant au test de Von Neumann, il ne passe encore pas (pval = 0 < 0.01).
+
+##Question 5
+
+Pour le test d'ordre, on utilise la fonction du paquet rantoolbox suivante :
+
+pval <- order.test(u, d=4, echo=FALSE)$p.value
+
+Voici les différents résultats obtenus pour chaque générateur : 
+
+* Von Neumann : 
+
+```{r,  echo=FALSE}
+pval <- order.test(as.vector(vn), d=4, echo=FALSE)$p.value
+print(pval)
+```
+
+* Randu
+
+```{r,  echo=FALSE}
+pval <- order.test(as.vector(rd), d=4, echo=FALSE)$p.value
+print(pval)
+```
+
+* Standard Minimal
+
+```{r,  echo=FALSE}
+pval <- order.test(as.vector(sm), d=4, echo=FALSE)$p.value
+print(pval)
+```
+
+* Mersenne-Twister
+
+```{r,  echo=FALSE}
+pval <- order.test(as.vector(mt), d=4, echo=FALSE)$p.value
+print(pval)
+```
+
+Encore une fois, le générateur de Von Neumann ne passe pas le test, avec une pvaleur de 0. Tous les autres le passent , avec une meilleure valeur pour Standard Minimal et Mersenne-Twister que pour Randu. 
+
+## Question 6
+
+Voici le code qui retourne en fonction des paramètres des lois d'exponentielles d'arrivées et de départs, et de la durée d'observation les listes comportant les horaires de départ et d'arrivées des personnes
+
+```{r}
+FileMM1 <- function(lambda, mu, D){
+  
+  arrivees <- rep(0,0)
+  tAct <- rexp(1,rate = lambda)
+  tDerniereArrivee <- 0
+  i <- 1
+  while((tAct + tDerniereArrivee) < D){
+    arrivees[i] <- tAct + tDerniereArrivee
+    tDerniereArrivee <- arrivees[i]
+    tAct <- rexp(1,rate = lambda)
+    i<-i+1
+  }
+  
+  departs <- rep(0,0)
+  departs[1]<-arrivees[1] + rexp(1,rate = mu)
+  for(k in 2:length(arrivees)){
+    tService <- rexp(1,rate = mu)
+    if(departs[k-1] < arrivees[k] ){
+      if((arrivees[k] + tService )<D){
+        departs[k]<-(arrivees[k] + tService)
+      } else {
+        break
+      }
+    } else {
+      if((departs[k-1] + tService)<D){
+        departs[k] <- (departs[k-1] + tService)
+      } else {
+        break
+      }
+    }
+  }
+  
+  ma_liste <- list(arrivees,departs)
+  return (ma_liste)
+}
+```
+
+Voici un exemple pour D = 10, lamba = 1 et mu = 1 :
+
+```{r,  echo=FALSE}
+liste <- FileMM1(1,1,10)
+print(liste)
+```
+
+## Question 7
+
+Voici le code de la fonction qui prend en paramètre l'instant maximal d'observation D et la liste list composée de la liste des arrivées et de celle des départs et retourne le nombre de personnes présentes dans la file d'attente à chaque minutes jusqu'à D, dans une liste.
+
+```{r}
+NbClientSysteme <- function(list,D){
+  tabClasse <- rep(0,D)
+  for (i in 1:length(list[[1]])  ) {
+   tabClasse[floor(list[[1]][i])+1] <- tabClasse[floor(list[[1]][i])+1] + 1
+  }
+  for (i in 1:length(list[[2]])  ) {
+    tabClasse[floor(list[[2]][i])+1] <- tabClasse[floor(list[[2]][i])+1] - 1
+  }
+  
+  for(k in 2:length(tabClasse)){
+    tabClasse[k]<-tabClasse[k] + tabClasse[k-1]
+  }
+  return(tabClasse)
+}
+```
+
+* 8 clients arrivent en moyenne par heure, 15 repartent, observé pendant 12 heures.
+La file d'attente est maîtrisée, le nombre de personnes qui attendent dépasse rarement 5.
+```{r setup1, include=FALSE}
+D<-60*12
+liste <- FileMM1(8/60,15/60,D)
+nbClient <- NbClientSysteme(liste,D)
+par(mfrow=c(1,1))
+```
+```{r, echo=FALSE}
+plot(1:D,nbClient[1:D],xlab='Temps en minutes', ylab='Nombre de clients', main='Nombre de clients dans la file en fonction du temps',type='s')
+```
+
+* 14 clients arrivent en moyenne par heure, 15 repartent, observé pendant 12 heures.
+On est proche de l'équilibre. Le nombre de personnes qui attendent dépasse rarement 15.
+```{r setup2, include=FALSE}
+D<-60*12
+liste <- FileMM1(14/60,15/60,D)
+nbClient <- NbClientSysteme(liste,D)
+par(mfrow=c(1,1))
+```
+```{r, echo=FALSE}
+plot(1:D,nbClient[1:D],xlab='Temps en minutes', ylab='Nombre de clients', main='Nombre de clients dans la file en fonction du temps',type='s')
+```
+
+* 15 clients arrivent en moyenne par heure, 15 repartent, observé pendant 12 heures.
+Le comportement de la file est alors chaotique. Selon les éxécutions, le nombre de personnes peut converger ou diverger.
+```{r setup3, include=FALSE}
+D<-60*12
+liste <- FileMM1(15/60,15/60,D)
+nbClient <- NbClientSysteme(liste,D)
+par(mfrow=c(1,1))
+```
+```{r, echo=FALSE}
+plot(1:D,nbClient[1:D],xlab='Temps en minutes', ylab='Nombre de clients', main='Nombre de clients dans la file en fonction du temps',type='s')
+```
+
+* 20 clients arrivent en moyenne par heure, 15 repartent, observé pendant 12 heures.
+La file d'attente est maintenant saturée : il y a en moyenne toujours plus de clients qui arrivent que de clients qui partent. L'attente ne fait que croître.
+```{r setup4, include=FALSE}
+D<-60*12
+liste <- FileMM1(20/60,15/60,D)
+nbClient <- NbClientSysteme(liste,D)
+par(mfrow=c(1,1))
+```
+```{r, echo=FALSE}
+plot(1:D,nbClient[1:D],xlab='Temps en minutes', ylab='Nombre de clients', main='Nombre de clients dans la file en fonction du temps',type='s')
+```
+
+On retrouve par observation l'idée intuitive que l'on a : si le nombre de personne qui arrivent est inférieur au nombre de personne qui partent, l'attente est maîtrisée, elle est saturée dans le cas contraire.
+
+## Question 8
+
+Voici le code permettant de calculer E(W) et E(N) pour vérifier la formule de Little : 
+
+```{r}
+Little <- function(list,D,nbClient){
+  EN <- 0
+  for (i in (1:length(nbClient))) {
+    EN <- EN + nbClient[i]
+  }
+  EN <- EN / length(nbClient)
+  EW <- 0
+  for (i in (1:min(   length(list[[1]])   ,   length(list[[2]])   ))) {
+    EW <- EW + list[[2]][i] - list[[1]][i]
+  }
+  EW <- EW / min(   length(list[[1]])   ,   length(list[[2]])   )
+  return(list(EN,EW))
+}
+```
+
+
+Nous avons ensuite testé la validité de la formule de little pour les 4 cas différents.
+
+* 8 arrivent clients par heure et 15 repartent
+```{r setup9, include=FALSE}
+liste <- FileMM1(8/60,15/60,D)
+nbClient <- NbClientSysteme(liste,D)
+little <- Little(liste,D,nbClient)
+```
+```{r, echo=FALSE}
+cat("E(N)= ",little[[1]])
+cat("lambda * E(w) = ",little[[2]]*(8/60))
+```
+
+* 14 arrivent clients par heure et 15 repartent
+
+```{r setup6, include=FALSE}
+liste <- FileMM1(14/60,15/60,D)
+nbClient <- NbClientSysteme(liste,D)
+little <- Little(liste,D,nbClient)
+```
+```{r, echo=FALSE}
+cat("E(N)= ",little[[1]])
+cat("lambda * E(w) = ",little[[2]]*(14/60))
+```
+
+* 15 arrivent clients par heure et 15 repartent
+
+```{r setup7, include=FALSE}
+liste <- FileMM1(15/60,15/60,D)
+nbClient <- NbClientSysteme(liste,D)
+little <- Little(liste,D,nbClient)
+```
+```{r, echo=FALSE}
+cat("E(N)= ",little[[1]])
+cat("lambda * E(w) = ",little[[2]]*(15/60))
+```
+
+* 20 arrivent clients par heure et 15 repartent
+
+```{r setup8, include=FALSE}
+liste <- FileMM1(20/60,15/60,D)
+nbClient <- NbClientSysteme(liste,D)
+little <- Little(liste,D,nbClient)
+```
+```{r, echo=FALSE}
+cat("E(N)= ",little[[1]])
+cat("lambda * E(w) = ",little[[2]]*(20/60))
+```
+
+On remarque que la formule de Little est validée pour les 3 premiers cas (delta = 0.1).  
+Pour le 4ème cas, la formule n'est pas validée. Cela est normal car alpha = 20/15 > 1.
+
+#Question Bonus
+
+Pour cette question, la forme de l'algorithme général est la même à savoir :
+
+Arrivée 1ere personne = temps attente  
+Arrivée n+1ième personne = arrivée n-ième personne + temps attente
+
+Depart 1ere personne = arrivée 1ere personne + temps passé  
+Depart n+1ième personne = Depart n+1ième personne + temps passé SI une des deux caisses est libre  
+OU Depart de la n-ième personne + temps passé SI aucune caisse de libre.
+
+La différence et la difficulté, c'est que la derniere personne partie avant le client en question, n'est pas forcément arrivée juste avant ce client la. Il se peut qu'entre temps, plusieurs clients soient passés sur l'autre caisse ou le temps d'attente aurait été plus court pendant quelques passages.  
+Il est donc nécessaire de stocker en mémoire à la fois la disponibilité des deux caisses, ainsi que le temps de départ du dernier client parti.
+
